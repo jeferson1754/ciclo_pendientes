@@ -263,6 +263,14 @@ mysqli_close($conexion);
             border-radius: 50%;
             border: 2px solid white;
         }
+
+        .color-dot {
+            top: -10px;
+            font-size: 30px;
+            margin-right: -5px;
+            position: relative;
+            color: limegreen;
+        }
     </style>
 </head>
 
@@ -355,12 +363,24 @@ mysqli_close($conexion);
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($pendientes as $item): ?>
+                <?php foreach ($pendientes as $item):
+
+                    $isActual = ($item['label'] == $viendo); ?>
                     <tr>
-                        <td><i class="fas <?= $item['icon'] ?>" style="color: <?= $item['color'] ?>; margin-right: 8px;"></i> <?= $item['label'] ?></td>
-                        <td><?= $item['valor'] ?></td>
                         <td>
-                            <div class="progress" style="height: 8px;">
+                            <a href="<?= $item['link'] ?>" style="color:black;text-decoration:none">
+                                <i class="fas <?= $item['icon'] ?>" style="color: <?= $item['color'] ?>; margin-right: 8px;"></i> <?= $item['label'] ?>
+                            </a>
+                        </td>
+                        <td>
+                            <?= $item['valor'] ?>
+                            <?php if ($isActual): ?>
+                                <span class="<?= $isActual ? ' color-dot' : '' ?>">&bull;</span>
+                            <?php endif; ?>
+                        </td>
+
+                        <td>
+                            <div class=" progress" style="height: 8px;">
                                 <div class="progress-bar" role="progressbar" style="width: <?= ($item['valor'] / $totalPendientes * 100) ?>%; background-color: <?= $item['color'] ?>"></div>
                             </div>
                         </td>

@@ -15,7 +15,7 @@ $consulta = "SELECT
     CASE 
         WHEN (SELECT COUNT(*) FROM series WHERE Estado = 'Viendo') > 0 THEN 'Series'
         WHEN (SELECT COUNT(*) FROM manga WHERE Estado = 'Viendo') > 0 THEN 'Mangas'
-        WHEN (SELECT COUNT(*) FROM webtoon WHERE Estado = 'Viendo') > 0 THEN 'Webtoons'
+        WHEN (SELECT COUNT(*) FROM webtoon WHERE Estado = 'Viendo') > 0 THEN 'Mangas'
         WHEN (SELECT COUNT(*) FROM peliculas WHERE Estado = 'Viendo') > 0 THEN 'Películas'
         WHEN (SELECT COUNT(*) FROM anime WHERE Estado = 'Viendo') > 0 THEN 'Animes'
         ELSE 'Ninguno'

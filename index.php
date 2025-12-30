@@ -1,25 +1,56 @@
 <?php
 include('../bd.php');
 
-$consulta = "SELECT 
-    (SELECT COUNT(*) FROM `series` WHERE Estado IN ('Pendiente', 'Viendo')) AS series,
-    (SELECT COUNT(*) FROM `manga` WHERE Faltantes > 0) AS mangas,
-    (SELECT COUNT(*) FROM `webtoon` WHERE Faltantes > 0) AS webtoons,
-    (SELECT COUNT(*) FROM `peliculas` WHERE Estado IN ('Pendiente', 'Viendo')) AS peliculas,
-    (SELECT COUNT(*) FROM `anime` WHERE Estado IN ('Pendiente', 'Viendo')) AS animes,
-    (SELECT COUNT(*) FROM `series` WHERE Estado = 'Viendo') AS viendo_series,
-    (SELECT COUNT(*) FROM `manga` WHERE Estado = 'Viendo') AS viendo_mangas,
-    (SELECT COUNT(*) FROM `webtoon` WHERE Estado = 'Viendo') AS viendo_webtoons,
-    (SELECT COUNT(*) FROM `peliculas` WHERE Estado = 'Viendo') AS viendo_peliculas,
-    (SELECT COUNT(*) FROM `anime` WHERE Estado = 'Viendo') AS viendo_animes,
-    CASE 
-        WHEN (SELECT COUNT(*) FROM series WHERE Estado = 'Viendo') > 0 THEN 'Series'
-        WHEN (SELECT COUNT(*) FROM manga WHERE Estado = 'Viendo') > 0 THEN 'Mangas'
-        WHEN (SELECT COUNT(*) FROM webtoon WHERE Estado = 'Viendo') > 0 THEN 'Mangas'
-        WHEN (SELECT COUNT(*) FROM peliculas WHERE Estado = 'Viendo') > 0 THEN 'Películas'
-        WHEN (SELECT COUNT(*) FROM anime WHERE Estado = 'Viendo') > 0 THEN 'Animes'
+$consulta = "
+SELECT
+   -- SERIES: bloques pendientes
+    (SELECT 
+        SUM(
+            CASE 
+                WHEN (Total - Vistos) > 0 
+                THEN CEIL((Total - Vistos) / 5)
+                ELSE 0
+            END
+        ) AS bloques_series
+    FROM series
+    WHERE Estado IN ('Pendiente', 'Viendo')
+    ) AS series,
+
+    -- MANGAS: hitos pendientes
+    (SELECT SUM(CEIL(Faltantes / 50))
+     FROM manga
+     WHERE Faltantes > 0
+    ) AS mangas,
+
+    -- WEBTOONS: hitos pendientes
+    (SELECT SUM(CEIL(Faltantes / 50))
+     FROM webtoon
+     WHERE Faltantes > 0
+    ) AS webtoons,
+
+    -- PELÍCULAS: unidades
+    (SELECT COUNT(*)
+     FROM peliculas
+     WHERE Estado IN ('Pendiente','Viendo')
+    ) AS peliculas,
+
+    -- ANIMES: temporadas pendientes
+    (SELECT COUNT(*)
+     FROM anime
+     WHERE Estado IN ('Pendiente','Viendo')
+    ) AS animes,
+
+    -- MODULO ACTUAL
+    CASE
+        WHEN EXISTS (SELECT 1 FROM series WHERE Estado = 'Viendo') THEN 'Series'
+        WHEN EXISTS (SELECT 1 FROM manga WHERE Estado = 'Viendo') THEN 'Mangas'
+        WHEN EXISTS (SELECT 1 FROM webtoon WHERE Estado = 'Viendo') THEN 'Mangas'
+        WHEN EXISTS (SELECT 1 FROM peliculas WHERE Estado = 'Viendo') THEN 'Películas'
+        WHEN EXISTS (SELECT 1 FROM anime WHERE Estado = 'Viendo') THEN 'Animes'
         ELSE 'Ninguno'
-    END AS modulo_actual;";
+    END AS modulo_actual;
+";
+
 
 
 
@@ -291,8 +322,8 @@ mysqli_close($conexion);
 
         // Construcción del array
         $pendientes = [];
-        if ($series > 0)    $pendientes[] = ['label' => 'Series',    'valor' => $series,        'color' => '#4361ee', 'icon' => 'fa-tv',        'link' => '../Series'];
-        if ($totalMangas > 0) $pendientes[] = ['label' => 'Mangas',   'valor' => $totalMangas,   'color' => '#7209b7', 'icon' => 'fa-book-open', 'link' => '../Manga'];
+        if ($series > 0)    $pendientes[] = ['label' => 'Series (bloques)',    'valor' => $series,        'color' => '#4361ee', 'icon' => 'fa-tv',        'link' => '../Series'];
+        if ($totalMangas > 0) $pendientes[] = ['label' => 'Mangas (hitos)',   'valor' => $totalMangas,   'color' => '#7209b7', 'icon' => 'fa-book-open', 'link' => '../Manga'];
         if ($peliculas > 0) $pendientes[] = ['label' => 'Películas', 'valor' => $peliculas,     'color' => '#f72585', 'icon' => 'fa-film',      'link' => '../Anime/peliculas/'];
         if ($totalAnimes > 0) $pendientes[] = ['label' => 'Animes',  'valor' => $totalAnimes,   'color' => '#f8961e', 'icon' => 'fa-dragon',    'link' => '../Anime/Pendientes/'];
 

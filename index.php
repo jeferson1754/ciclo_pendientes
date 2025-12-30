@@ -322,10 +322,10 @@ mysqli_close($conexion);
 
         // Construcción del array
         $pendientes = [];
-        if ($series > 0)    $pendientes[] = ['label' => 'Series (bloques)',    'valor' => $series,        'color' => '#4361ee', 'icon' => 'fa-tv',        'link' => '../Series'];
-        if ($totalMangas > 0) $pendientes[] = ['label' => 'Mangas (hitos)',   'valor' => $totalMangas,   'color' => '#7209b7', 'icon' => 'fa-book-open', 'link' => '../Manga'];
-        if ($peliculas > 0) $pendientes[] = ['label' => 'Películas', 'valor' => $peliculas,     'color' => '#f72585', 'icon' => 'fa-film',      'link' => '../Anime/peliculas/'];
-        if ($totalAnimes > 0) $pendientes[] = ['label' => 'Animes',  'valor' => $totalAnimes,   'color' => '#f8961e', 'icon' => 'fa-dragon',    'link' => '../Anime/Pendientes/'];
+        if ($series > 0)    $pendientes[] = ['texto' => 'Series',    'label' => 'Series (bloques)',    'valor' => $series,        'color' => '#4361ee', 'icon' => 'fa-tv',        'link' => '../Series'];
+        if ($totalMangas > 0) $pendientes[] = ['texto' => 'Mangas',   'label' => 'Mangas (hitos)',   'valor' => $totalMangas,   'color' => '#7209b7', 'icon' => 'fa-book-open', 'link' => '../Manga'];
+        if ($peliculas > 0) $pendientes[] = ['texto' => 'Películas', 'label' => 'Películas', 'valor' => $peliculas,     'color' => '#f72585', 'icon' => 'fa-film',      'link' => '../Anime/peliculas/'];
+        if ($totalAnimes > 0) $pendientes[] = ['texto' => 'Animes',  'label' => 'Animes',  'valor' => $totalAnimes,   'color' => '#f8961e', 'icon' => 'fa-dragon',    'link' => '../Anime/Pendientes/'];
 
         $total = count($pendientes);
         $radius = 180;
@@ -346,11 +346,10 @@ mysqli_close($conexion);
             $x = $centerX + $radius * cos($angle) - 60;
             $y = $centerY + $radius * sin($angle) - 60;
 
-            $isActual = ($item['label'] == $viendo);
+            $isActual = ($item['texto'] == $viendo);
 
             echo "<a href='{$item['link']}' class='item' style='left: {$x}px; top: {$y}px; border-top: 4px solid {$item['color']}; text-decoration:none'>";
             echo "<div class='value" . ($isActual ? ' actual' : '') . "' style='color: {$item['color']}'>{$item['valor']}</div>";
-            #echo "<div class='value actual' style='color: {$item['color']}'>{$item['valor']}</div>";
             echo "<div class='label'><i class='fas {$item['icon']}' style='margin-right: 5px; color: {$item['color']}'></i>{$item['label']}</div>";
 
             echo "</a>";

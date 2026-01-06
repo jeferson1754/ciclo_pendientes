@@ -4,26 +4,27 @@ include('../bd.php');
 $consulta = "
 SELECT
    -- SERIES: bloques pendientes
-    (SELECT 
+    (SELECT CEIL( 
         SUM(
             CASE 
                 WHEN (Total - Vistos) > 0 
-                THEN CEIL((Total - Vistos) / 5)
+                THEN (Total - Vistos) / 5
                 ELSE 0
             END
-        ) AS bloques_series
+        )) AS bloques_series
+        
     FROM series
     WHERE Estado IN ('Pendiente', 'Viendo')
     ) AS series,
 
     -- MANGAS: hitos pendientes
-    (SELECT SUM(CEIL(Faltantes / 50))
+    (SELECT CEIL(SUM(Faltantes)/50)
      FROM manga
      WHERE Faltantes > 0
     ) AS mangas,
 
     -- WEBTOONS: hitos pendientes
-    (SELECT SUM(CEIL(Faltantes / 50))
+    (SELECT CEIL(SUM(Faltantes)/50)
      FROM webtoon
      WHERE Faltantes > 0
     ) AS webtoons,

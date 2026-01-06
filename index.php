@@ -540,13 +540,21 @@ mysqli_close($conexion);
                     <tr>
                         <td>
                             <a href="<?= $item['link'] ?>" style="color:black;text-decoration:none">
-                                <i class="fas <?= $item['icon'] ?>" style="color: <?= $item['color'] ?>; margin-right: 8px;"></i> <?= $item['label'] ?>
+                                <i class="fas <?= $item['icon'] ?>"
+                                    style="color: <?= $item['color'] ?>; margin-right: 8px;"></i>
+                                <?= $item['label'] ?>
                             </a>
                         </td>
-                        <td>
-                            <?= $item['valor'] ?>
+
+                        <td style="white-space: nowrap;">
+                            <strong><?= $item['valor'] ?></strong>
+
+                            <?php if (isset($item['icono'])): ?>
+                                <?= $item['icono'] ?>
+                            <?php endif; ?>
+
                             <?php if ($isActual): ?>
-                                <span class="<?= $isActual ? ' color-dot' : '' ?>">&bull;</span>
+                                <span class="color-dot" title="Categoría activa">&bull;</span>
                             <?php endif; ?>
                         </td>
 
@@ -556,6 +564,7 @@ mysqli_close($conexion);
                             </div>
                         </td>
                     </tr>
+
                 <?php endforeach; ?>
             </tbody>
         </table>

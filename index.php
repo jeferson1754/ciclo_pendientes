@@ -42,14 +42,62 @@ SELECT
 
     -- MODULO ACTUAL
     CASE
+        WHEN EXISTS (SELECT 1 FROM anime WHERE Estado = 'Viendo') THEN 'Animes'
         WHEN EXISTS (SELECT 1 FROM series WHERE Estado = 'Viendo') THEN 'Series'
         WHEN EXISTS (SELECT 1 FROM manga WHERE Estado = 'Viendo') THEN 'Mangas'
         WHEN EXISTS (SELECT 1 FROM webtoon WHERE Estado = 'Viendo') THEN 'Mangas'
         WHEN EXISTS (SELECT 1 FROM peliculas WHERE Estado = 'Viendo') THEN 'Películas'
-        WHEN EXISTS (SELECT 1 FROM anime WHERE Estado = 'Viendo') THEN 'Animes'
         ELSE 'Ninguno'
     END AS modulo_actual;
 ";
+
+function obtenerUltimoTotal($conexion, $categoria, $valor_actual)
+{
+    $categoria = mysqli_real_escape_string($conexion, $categoria);
+
+    $sql = "
+        SELECT total_anterior 
+        FROM estadisticas_historial 
+        WHERE categoria = '$categoria' AND total_anterior NOT IN ($valor_actual, 0)
+        ORDER BY fecha_actualizacion DESC 
+        LIMIT 1
+    ";
+
+    $result = mysqli_query($conexion, $sql);
+
+    if ($result && mysqli_num_rows($result) > 0) {
+        return mysqli_fetch_row($result)[0];
+    }
+
+    return null; // No hay historial aún
+}
+
+function obtenerIconoCambio($actual, $anterior)
+{
+    // Si no hay historial previo
+    if ($anterior === null) {
+        return '';
+    }
+
+    $diferencia = $actual - $anterior;
+
+    // Sin cambio
+    if ($diferencia === 0) {
+        return "<span style='color:#999; font-size:0.75rem; margin-left:5px;'>—</span>";
+    }
+
+    // Progreso (disminuye pendientes)
+    if ($diferencia < 0) {
+        return "<span style='color:#2ecc71; font-size:0.75rem; font-weight:bold; margin-left:5px;'>
+                    <i class='fas fa-arrow-down'></i> " . abs($diferencia) . "
+                </span>";
+    }
+
+    // Retroceso (aumentan pendientes)
+    return "<span style='color:#e74c3c; font-size:0.75rem; font-weight:bold; margin-left:5px;'>
+                <i class='fas fa-arrow-up'></i> $diferencia
+            </span>";
+}
 
 
 
@@ -65,6 +113,21 @@ $peliculas = $datos['peliculas'];
 $animes = $datos['animes'];
 
 $viendo = $datos['modulo_actual'];
+
+$series_anterior     = obtenerUltimoTotal($conexion, 'Series', $series);
+$mangas_anterior     = obtenerUltimoTotal($conexion, 'Mangas', $mangas);
+$peliculas_anterior  = obtenerUltimoTotal($conexion, 'Películas', $peliculas);
+$animes_anterior     = obtenerUltimoTotal($conexion, 'Animes', $animes);
+
+$series_restante    = is_null($series_anterior)    ? 0 : $series - $series_anterior;
+$mangas_restante    = is_null($mangas_anterior)    ? 0 : $mangas - $mangas_anterior;
+$peliculas_restante = is_null($peliculas_anterior) ? 0 : $peliculas - $peliculas_anterior;
+$animes_restante    = is_null($animes_anterior)    ? 0 : $animes - $animes_anterior;
+
+$icono_series = obtenerIconoCambio($series, $series_anterior);
+$icono_mangas = obtenerIconoCambio($mangas, $mangas_anterior);
+$icono_peliculas = obtenerIconoCambio($peliculas, $peliculas_anterior);
+$icono_animes = obtenerIconoCambio($animes, $animes_anterior);
 
 
 mysqli_close($conexion);
@@ -322,10 +385,58 @@ mysqli_close($conexion);
 
         // Construcción del array
         $pendientes = [];
-        if ($series > 0)    $pendientes[] = ['texto' => 'Series',    'label' => 'Series (bloques)',    'valor' => $series,        'color' => '#4361ee', 'icon' => 'fa-tv',        'link' => '../Series'];
-        if ($totalMangas > 0) $pendientes[] = ['texto' => 'Mangas',   'label' => 'Mangas (hitos)',   'valor' => $totalMangas,   'color' => '#7209b7', 'icon' => 'fa-book-open', 'link' => '../Manga'];
-        if ($peliculas > 0) $pendientes[] = ['texto' => 'Películas', 'label' => 'Películas', 'valor' => $peliculas,     'color' => '#f72585', 'icon' => 'fa-film',      'link' => '../Anime/peliculas/'];
-        if ($totalAnimes > 0) $pendientes[] = ['texto' => 'Animes',  'label' => 'Animes',  'valor' => $totalAnimes,   'color' => '#f8961e', 'icon' => 'fa-dragon',    'link' => '../Anime/Pendientes/'];
+        if ($series > 0) {
+            $pendientes[] = [
+                'texto'    => 'Series',
+                'label'    => 'Series (bloques)',
+                'valor'    => $series,
+                'anterior' => $series_anterior,
+                'icono'    => obtenerIconoCambio($series, $series_anterior),
+                'color'    => '#4361ee',
+                'icon'     => 'fa-tv',
+                'link'     => '../Series'
+            ];
+        }
+
+        if ($totalMangas > 0) {
+            $pendientes[] = [
+                'texto'    => 'Mangas',
+                'label'    => 'Mangas (hitos)',
+                'valor'    => $totalMangas,
+                'anterior' => $mangas_anterior,
+                'icono'    => obtenerIconoCambio($totalMangas, $mangas_anterior),
+                'color'    => '#7209b7',
+                'icon'     => 'fa-book-open',
+                'link'     => '../Manga'
+            ];
+        }
+
+        if ($peliculas > 0) {
+            $pendientes[] = [
+                'texto'    => 'Películas',
+                'label'    => 'Películas',
+                'valor'    => $peliculas,
+                'anterior' => $peliculas_anterior,
+                'icono'    => obtenerIconoCambio($peliculas, $peliculas_anterior),
+                'color'    => '#f72585',
+                'icon'     => 'fa-film',
+                'link'     => '../Anime/peliculas/'
+            ];
+        }
+
+        if ($totalAnimes > 0) {
+            $pendientes[] = [
+                'texto'    => 'Animes',
+                'label'    => 'Animes',
+                'valor'    => $totalAnimes,
+                'anterior' => $animes_anterior,
+                'icono'    => obtenerIconoCambio($totalAnimes, $animes_anterior),
+                'color'    => '#f8961e',
+                'icon'     => 'fa-dragon',
+                'link'     => '../Anime/Pendientes/'
+            ];
+        }
+
 
         $total = count($pendientes);
         $radius = 180;
@@ -347,10 +458,40 @@ mysqli_close($conexion);
             $y = $centerY + $radius * sin($angle) - 60;
 
             $isActual = ($item['texto'] == $viendo);
-
+            /*
             echo "<a href='{$item['link']}' class='item' style='left: {$x}px; top: {$y}px; border-top: 4px solid {$item['color']}; text-decoration:none'>";
             echo "<div class='value" . ($isActual ? ' actual' : '') . "' style='color: {$item['color']}'>{$item['valor']}</div>";
             echo "<div class='label'><i class='fas {$item['icon']}' style='margin-right: 5px; color: {$item['color']}'></i>{$item['label']}</div>";
+
+            echo "</a>";
+            */
+
+            echo "<a href='{$item['link']}' 
+          class='item' 
+          style='
+              left: {$x}px; 
+              top: {$y}px; 
+              border-top: 4px solid {$item['color']}; 
+              text-decoration:none;
+          '>";
+
+            echo "  <div class='value" . ($isActual ? ' actual' : '') . "' 
+              style='
+                  color: {$item['color']}; 
+                  display: flex; 
+                  align-items: center; 
+                  justify-content: center; 
+                  gap: 6px;
+              '>
+            <span>{$item['valor']}</span>
+            {$item['icono']}
+        </div>";
+
+            echo "  <div class='label' style='margin-top:4px;'>
+            <i class='fas {$item['icon']}' 
+               style='margin-right: 6px; color: {$item['color']}'></i>
+            {$item['label']}
+        </div>";
 
             echo "</a>";
         }

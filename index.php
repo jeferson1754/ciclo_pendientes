@@ -126,6 +126,24 @@ function obtenerVerboModulo(string $modulo): string
     };
 }
 
+function obtenerSiguienteModulo(string $actual, array $orden): ?string
+{
+    $index = array_search($actual, $orden);
+
+    if ($index === false) return null;
+
+    return $orden[$index + 1] ?? null;
+}
+
+
+function limitarCaracteres(string $texto, int $limite = 20): string
+{
+    if (mb_strlen($texto) <= $limite) {
+        return $texto;
+    }
+    return mb_substr($texto, 0, $limite) . '...';
+}
+
 
 
 $resultado = mysqli_query($conexion, $consulta);
@@ -179,15 +197,30 @@ LIMIT 1;
 
 $sql_manga = "SELECT 
     'Mangas' AS modulo,
-    Nombre,
-    '' as detalle,
-    `Capitulos Vistos` as vistos,
-    `Capitulos Totales` as total,
-    'fa-book-open' as icono,
-    `Capitulos Totales` as tipo
+    Nombre COLLATE utf8mb4_general_ci AS Nombre,
+    '' AS detalle,
+    `Capitulos Vistos` AS vistos,
+    `Capitulos Totales` AS total,
+    'fa-book-open' AS icono,
+    `Capitulos Totales` AS tipo
 FROM manga
 WHERE Estado = 'Viendo'
+
+UNION ALL
+
+SELECT 
+    'Mangas' AS modulo,
+    Nombre COLLATE utf8mb4_general_ci AS Nombre,
+    '' AS detalle,
+    `Capitulos Vistos` AS vistos,
+    `Capitulos Totales` AS total,
+    'fa-book-open' AS icono,
+    `Capitulos Totales` AS tipo
+FROM webtoon
+WHERE Estado = 'Viendo'
+
 LIMIT 1;
+
 ";
 
 $sql_peliculas = "SELECT 
@@ -235,10 +268,146 @@ foreach ($ordenDeseado as $nombre) {
 
 $actual = $modulosOrdenados[0] ?? null;
 
+$siguienteModulo = obtenerSiguienteModulo($actual['modulo'], $ordenDeseado);
+
+function siguienteAnime(mysqli $conexion): ?string
+{
+    $sql = "
+        SELECT Nombre, pendientes.Temporada, pendientes.Total, pendientes.Vistos
+        FROM anime
+        INNER JOIN pendientes ON pendientes.ID_Anime=anime.id
+        WHERE pendientes.Tipo != 'Pelicula'
+        ORDER BY pendientes.Pendientes ASC
+        LIMIT 1;
+    ";
+
+    $r = mysqli_query($conexion, $sql);
+    if (!$row = mysqli_fetch_assoc($r)) return null;
+
+    // 🔹 Determinar temporada actual o siguiente
+    if ($row['Vistos'] >= $row['Total']) {
+        $texto = "(Completo)";
+    } else {
+        $texto = "";
+    }
+
+    return "{$row['Nombre']} {$row['Temporada']} - {$row['Vistos']}/{$row['Total']} $texto";
+}
+
+function siguienteBloqueSeries(mysqli $conexion): ?string
+{
+    $sql = "
+        SELECT Nombre, Temporadas, Total, Vistos
+        FROM series
+        WHERE Estado IN ('Pendiente','Viendo')
+        ORDER BY ID ASC
+        LIMIT 1
+    ";
+
+    $r = mysqli_query($conexion, $sql);
+    if (!$row = mysqli_fetch_assoc($r)) return null;
+
+    // 🔹 Regla de bloques
+    if ($row['Total'] <= 8) {
+        // Temporada corta → 1 bloque = temporada completa
+        $tamBloque = $row['Total'];
+        $bloque = 1;
+    } else {
+        // Temporada larga → bloques de 5 episodios
+        $tamBloque = 5;
+        $bloque = floor($row['Vistos'] / $tamBloque) + 1;
+    }
+
+    // 🔹 Determinar temporada actual o siguiente
+    if ($row['Vistos'] >= $row['Total']) {
+        $temporada = $row['Temporadas'] + 1;
+        $bloque = 1;
+        $texto = "Inicio de";
+    } else {
+        $temporada = $row['Temporadas'];
+        $texto = "";
+    }
+
+
+    return "{$row['Nombre']} ($texto T{$temporada}) - Bloque {$bloque} · {$tamBloque} eps";
+}
+
+
+function siguienteHitoManga(mysqli $conexion): ?string
+{
+    $sql = "
+        SELECT 
+            manga.Nombre,
+            manga.`Capitulos Vistos` as vistos,
+            manga.`Capitulos Totales` as totales,
+            manga.Faltantes,
+            manga.Estado
+        FROM manga
+        LEFT JOIN `tachiyomi` ON manga.ID = tachiyomi.ID_Manga 
+        WHERE tachiyomi.ID_Manga IS NULL AND manga.Faltantes > 0
+        ORDER BY manga.Cantidad DESC
+        LIMIT 1;
+    ";
+
+    $r = mysqli_query($conexion, $sql);
+    if (!$row = mysqli_fetch_assoc($r)) return null;
+
+    $tamHito = 50;
+
+    // Calcular hito actual
+    $hito = floor($row['vistos'] / $tamHito) + 1;
+
+    if ($row['Estado'] == 'Finalizado') {
+        return "{$row['Nombre']} — {$row['vistos']} / {$row['totales']} caps (Final) — Hito {$hito}";
+    } else {
+        // Siguiente hito
+        $siguienteHito = ceil(($row['vistos'] + 1) / $tamHito) * $tamHito;
+        $mostrarHasta = min($siguienteHito, $row['totales']);
+        return "{$row['Nombre']} — {$row['vistos']} / {$mostrarHasta} caps — Hito {$hito}";
+    }
+}
 
 
 
-mysqli_close($conexion);
+function siguientePelicula(mysqli $conexion): ?string
+{
+    $sql = "
+    SELECT 
+        CONCAT_WS(' ', anime.Nombre, peliculas.Nombre) AS Nombre
+    FROM peliculas
+    LEFT JOIN anime ON peliculas.ID_Anime = anime.id
+    WHERE peliculas.Estado = 'Pendiente'
+    ORDER BY peliculas.ID ASC
+    LIMIT 1;
+    ";
+
+    $r = mysqli_query($conexion, $sql);
+    if (!$row = mysqli_fetch_assoc($r)) return null;
+
+    return $row['Nombre'];
+}
+
+$siguienteTexto = null;
+
+switch ($siguienteModulo) {
+    case 'Animes':
+        $siguienteTexto = siguienteAnime($conexion);
+        break;
+
+    case 'Series':
+        $siguienteTexto = siguienteBloqueSeries($conexion);
+        break;
+
+    case 'Mangas':
+        $siguienteTexto = siguienteHitoManga($conexion);
+        break;
+
+    case 'Películas':
+        $siguienteTexto = siguientePelicula($conexion);
+        break;
+}
+
+
 ?>
 
 <!DOCTYPE html>
@@ -534,6 +703,54 @@ mysqli_close($conexion);
             color: #4361ee;
             margin-left: 6px;
         }
+
+        .siguiente-consumo {
+            margin-top: 14px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .siguiente-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            opacity: 0.7;
+        }
+
+        .siguiente-detalle {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        .siguiente-consumo-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .siguiente-consumo-item {
+            background: #f5f5f5;
+            padding: 8px 12px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .siguiente-label {
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+        }
+
+        .siguiente-detalle {
+            font-size: 13px;
+            color: #555;
+            margin-top: 3px;
+        }
     </style>
 </head>
 
@@ -555,7 +772,10 @@ mysqli_close($conexion);
                     <?= obtenerVerboModulo($actual['modulo']); ?>
                 </span>
                 <span class="viendo-nombre">
-                    <?= $actual['Nombre']; ?>
+                    <span title="<?= htmlspecialchars($actual['Nombre']) ?>">
+                        <?= limitarCaracteres($actual['Nombre'], 50); ?>
+                    </span>
+
                     <?php if (!empty($actual['total'])): ?>
                         <span class="viendo-progreso" style="color: var(--<?= $actual['modulo']; ?>)">
                             - <?= $actual['vistos']; ?> / <?= $actual['total']; ?>
@@ -810,6 +1030,91 @@ mysqli_close($conexion);
             <?php endforeach; ?>
         </div>
     </div>
+
+
+
+    <?php
+    // $pendientes = array de módulos con ['texto', 'label', 'valor', 'color', 'icon', 'link']
+    // $viendo = módulo actual (ej: 'Animes')
+
+    // Reordenar módulos para que el siguiente al actual vaya primero
+    $siguienteModuloArray = [];
+    $otrosModulos = [];
+
+    $encontrado = false;
+    foreach ($pendientes as $item) {
+        if ($encontrado) {
+            $siguienteModuloArray[] = $item;
+        } elseif ($item['texto'] == $viendo) {
+            $encontrado = true;
+        } else {
+            $otrosModulos[] = $item;
+        }
+    }
+
+    // Combinar: siguiente al actual primero, luego los demás
+    $ordenFinal = array_merge($siguienteModuloArray, $otrosModulos);
+    ?>
+
+    <?php
+    // Reordenar módulos para que el siguiente al actual vaya primero
+    $siguienteModuloArray = [];
+    $otrosModulos = [];
+    $encontrado = false;
+
+    foreach ($pendientes as $item) {
+        if ($encontrado) {
+            $siguienteModuloArray[] = $item;
+        } elseif ($item['texto'] == $viendo) {
+            $encontrado = true;
+        } else {
+            $otrosModulos[] = $item;
+        }
+    }
+
+    // Combinar: siguiente al actual primero, luego los demás
+    $ordenFinal = array_merge($siguienteModuloArray, $otrosModulos);
+
+    // Generar el detalle de “siguiente” para cada módulo
+    foreach ($ordenFinal as &$item) {
+        switch ($item['texto']) {
+            case 'Animes':
+                $item['siguienteTexto'] = siguienteAnime($conexion);
+                break;
+            case 'Series':
+                $item['siguienteTexto'] = siguienteBloqueSeries($conexion);
+                break;
+            case 'Mangas':
+                $item['siguienteTexto'] = siguienteHitoManga($conexion);
+                break;
+            case 'Películas':
+                $item['siguienteTexto'] = siguientePelicula($conexion);
+                break;
+            default:
+                $item['siguienteTexto'] = '';
+        }
+    }
+    unset($item); // romper referencia
+    ?>
+
+    <?php if (!empty($ordenFinal)): ?>
+        <div class="siguiente-consumo-container">
+            <?php foreach ($ordenFinal as $item): ?>
+                <div class="siguiente-consumo-item" style="border-left: 5px solid <?= $item['color'] ?>;">
+                    <span class="siguiente-label" style="color: <?= $item['color'] ?>;">
+                        <i class="fas <?= $item['icon'] ?>" style="margin-right:6px;"></i>
+                        <?= rtrim($item['texto'], 's') ?>:
+                    </span>
+                    <div class="siguiente-detalle">
+                        <?= $item['siguienteTexto'] ?: ($item['label'] . ' — ' . $item['valor']) ?>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+
+
+
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>

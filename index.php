@@ -1,7 +1,7 @@
 <?php
 include('../bd.php');
 
-$ordenDeseado = ['Animes', 'Series','Mangas','Películas'];
+$ordenDeseado = ['Animes', 'Series', 'Mangas', 'Películas'];
 
 $mapaExists = [
     'Series' => "EXISTS (SELECT 1 FROM series WHERE Estado = 'Viendo')",
@@ -118,6 +118,13 @@ function obtenerIconoCambio($actual, $anterior)
             </span>";
 }
 
+function obtenerVerboModulo(string $modulo): string
+{
+    return match ($modulo) {
+        'Mangas'      => 'Estás leyendo',
+        default       => 'Estás viendo'
+    };
+}
 
 
 
@@ -544,7 +551,9 @@ mysqli_close($conexion);
             </span>
 
             <div class="viendo-texto">
-                <span class="viendo-label">Estás viendo</span>
+                <span class="viendo-label">
+                    <?= obtenerVerboModulo($actual['modulo']); ?>
+                </span>
                 <span class="viendo-nombre">
                     <?= $actual['Nombre']; ?>
                     <?php if (!empty($actual['total'])): ?>

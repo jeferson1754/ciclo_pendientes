@@ -1,6 +1,30 @@
 <?php
 include('../bd.php');
 
+$ordenDeseado = ['Animes', 'Series','Mangas','Películas'];
+
+$mapaExists = [
+    'Series' => "EXISTS (SELECT 1 FROM series WHERE Estado = 'Viendo')",
+    'Mangas' => "EXISTS (
+                    SELECT 1 FROM manga WHERE Estado = 'Viendo'
+                    UNION ALL
+                    SELECT 1 FROM webtoon WHERE Estado = 'Viendo'
+                 )",
+    'Películas' => "EXISTS (SELECT 1 FROM peliculas WHERE Estado = 'Viendo')",
+    'Animes' => "EXISTS (SELECT 1 FROM anime WHERE Estado = 'Viendo')"
+];
+
+$caseSql = "CASE\n";
+
+foreach ($ordenDeseado as $modulo) {
+    if (isset($mapaExists[$modulo])) {
+        $caseSql .= "    WHEN {$mapaExists[$modulo]} THEN '$modulo'\n";
+    }
+}
+
+$caseSql .= "    ELSE 'Ninguno'\nEND AS modulo_actual";
+
+
 $consulta = "
 SELECT
    -- SERIES: bloques pendientes
@@ -42,15 +66,9 @@ SELECT
     ) AS animes,
 
     -- MODULO ACTUAL
-    CASE
-        WHEN EXISTS (SELECT 1 FROM anime WHERE Estado = 'Viendo') THEN 'Animes'
-        WHEN EXISTS (SELECT 1 FROM series WHERE Estado = 'Viendo') THEN 'Series'
-        WHEN EXISTS (SELECT 1 FROM manga WHERE Estado = 'Viendo') THEN 'Mangas'
-        WHEN EXISTS (SELECT 1 FROM webtoon WHERE Estado = 'Viendo') THEN 'Mangas'
-        WHEN EXISTS (SELECT 1 FROM peliculas WHERE Estado = 'Viendo') THEN 'Películas'
-        ELSE 'Ninguno'
-    END AS modulo_actual;
+    $caseSql
 ";
+
 
 function obtenerUltimoTotal($conexion, $categoria, $valor_actual)
 {
@@ -130,6 +148,88 @@ $icono_mangas = obtenerIconoCambio($mangas, $mangas_anterior);
 $icono_peliculas = obtenerIconoCambio($peliculas, $peliculas_anterior);
 $icono_animes = obtenerIconoCambio($animes, $animes_anterior);
 
+$sql_series = "SELECT 'Series' AS modulo,
+ Nombre,CONCAT('Temporada ', Temporadas) AS detalle,
+ Vistos as vistos, Total As total, 
+'fa-tv' as icono,
+ Total AS tipo
+FROM `series`
+WHERE Estado='Viendo'
+LIMIT 1;
+";
+
+$sql_anime = "SELECT 'Animes' AS modulo, 
+Nombre, Temporadas as detalle,
+ pendientes.Vistos as vistos,
+  pendientes.Total as total,
+  'fa-dragon' as icono,
+ pendientes.Total as tipo
+FROM anime
+INNER JOIN pendientes ON anime.id= pendientes.ID_Anime
+WHERE anime.Estado = 'Viendo'
+LIMIT 1;
+";
+
+$sql_manga = "SELECT 
+    'Mangas' AS modulo,
+    Nombre,
+    '' as detalle,
+    `Capitulos Vistos` as vistos,
+    `Capitulos Totales` as total,
+    'fa-book-open' as icono,
+    `Capitulos Totales` as tipo
+FROM manga
+WHERE Estado = 'Viendo'
+LIMIT 1;
+";
+
+$sql_peliculas = "SELECT 
+    'Películas' AS modulo,
+    CONCAT_WS(' - ', anime.Nombre, peliculas.Nombre) AS Nombre,
+    '' AS detalle,
+    0 AS vistos,
+    0 AS total,
+    'fa-film' as icono,
+    'Estado' AS tipo
+FROM peliculas
+LEFT JOIN anime ON peliculas.ID_Anime = anime.id
+WHERE peliculas.Estado = 'Viendo'
+LIMIT 1;
+";
+
+$modulos = [
+    'series'    => $sql_series,
+    'manga'     => $sql_manga,
+    'peliculas' => $sql_peliculas,
+    'anime'     => $sql_anime
+];
+
+foreach ($modulos as $sql) {
+    $res = mysqli_query($conexion, $sql);
+    if ($fila = mysqli_fetch_assoc($res)) {
+        $actual = $fila;
+        break;
+    }
+}
+
+$modulosOrdenados = [];
+
+foreach ($ordenDeseado as $nombre) {
+    foreach ($modulos as $sql) {
+        $res = mysqli_query($conexion, $sql);
+        if ($fila = mysqli_fetch_assoc($res)) {
+            if ($fila['modulo'] === $nombre) {
+                $modulosOrdenados[] = $fila;
+                break 2;
+            }
+        }
+    }
+}
+
+$actual = $modulosOrdenados[0] ?? null;
+
+
+
 
 mysqli_close($conexion);
 ?>
@@ -154,6 +254,10 @@ mysqli_close($conexion);
             --success-color: #4cc9f0;
             --dark-color: #212529;
             --light-color: #f8f9fa;
+            --Series: #4361ee;
+            --Mangas: #7209b7;
+            --Películas: #f72585;
+            --Animes: #f8961e;
         }
 
         body {
@@ -366,6 +470,63 @@ mysqli_close($conexion);
             position: relative;
             color: limegreen;
         }
+
+        .viendo-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 18px;
+            background: #ffffff;
+            border-radius: 14px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+            margin-bottom: 1.5rem;
+        }
+
+        .viendo-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .viendo-texto {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.2;
+        }
+
+        .viendo-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #6c757d;
+            font-weight: 500;
+        }
+
+        .viendo-nombre {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #212529;
+        }
+
+        .viendo-detalle {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #6c757d;
+            margin-left: 4px;
+        }
+
+        .viendo-progreso {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #4361ee;
+            margin-left: 6px;
+        }
     </style>
 </head>
 
@@ -374,6 +535,31 @@ mysqli_close($conexion);
         <h1>Mi Ciclo de Pendientes</h1>
         <p>Visualiza tus series, películas, mangas y animes pendientes en un círculo interactivo</p>
     </div>
+
+    <?php if ($actual): ?>
+        <div class="viendo-header">
+            <span class="viendo-icon"
+                style="background-color: var(--<?= $actual['modulo']; ?>)">
+                <i class="fas <?= $actual['icono']; ?>"></i>
+            </span>
+
+            <div class="viendo-texto">
+                <span class="viendo-label">Estás viendo</span>
+                <span class="viendo-nombre">
+                    <?= $actual['Nombre']; ?>
+                    <?php if (!empty($actual['total'])): ?>
+                        <span class="viendo-progreso" style="color: var(--<?= $actual['modulo']; ?>)">
+                            - <?= $actual['vistos']; ?> / <?= $actual['total']; ?>
+                        </span>
+                    <?php endif; ?>
+                </span>
+            </div>
+        </div>
+    <?php endif; ?>
+
+
+
+
 
     <div class="circle-container">
         <div class="circle-bg"></div>
@@ -444,6 +630,12 @@ mysqli_close($conexion);
         $centerX = 250;
         $centerY = 250;
 
+        usort($pendientes, function ($a, $b) use ($ordenDeseado) {
+            return array_search($a['texto'], $ordenDeseado)
+                <=> array_search($b['texto'], $ordenDeseado);
+        });
+
+
         $actualKey = array_keys($pendientes, max($pendientes))[0]; // ← esto lo puedes cambiar por tu lógica
 
         // Mostrar el centro con el total
@@ -454,7 +646,10 @@ mysqli_close($conexion);
 
         // Mostrar los ítems con enlaces
         foreach ($pendientes as $index => $item) {
-            $angle = (2 * pi() / $total) * $index;
+            //$angle = (2 * pi() / $total) * $index;
+            $angle = (2 * pi() / $total) * $index - (pi() / 2);
+
+
             $x = $centerX + $radius * cos($angle) - 60;
             $y = $centerY + $radius * sin($angle) - 60;
 
@@ -502,17 +697,24 @@ mysqli_close($conexion);
 
         // Mostrar flechas
         for ($i = 0; $i < $total; $i++) {
-            $nextIndex = ($i + 1) % $total;
-            $angleMid = (2 * pi() / $total) * ($i + 0.5); // Punto medio exacto
 
-            // Radio alternado (70px para pares, 50px para impares)
-            $arrowRadius = ($i % 2 == 0) ? $radius - 50 : $radius - 50;
+            // Punto medio entre ítem i y el siguiente
+            $angleMid = (2 * pi() / $total) * ($i + 0.5) - (pi() / 2);
+
+            $arrowRadius = $radius - 50;
 
             $x = $centerX + $arrowRadius * cos($angleMid) - 15;
             $y = $centerY + $arrowRadius * sin($angleMid) - 15;
 
-            echo "<i class='fas fa-arrow-right arrow' style='left: {$x}px; top: {$y}px; transform: rotate(" . (rad2deg($angleMid) + 90) . "deg); color: {$pendientes[$i]['color']};'></i>";
+            echo "<i class='fas fa-arrow-right arrow'
+        style='
+            left: {$x}px;
+            top: {$y}px;
+            transform: rotate(" . (rad2deg($angleMid) + 90) . "deg);
+            color: {$pendientes[$i]['color']};
+        '></i>";
         }
+
         ?>
     </div>
 

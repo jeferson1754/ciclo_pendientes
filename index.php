@@ -1,7 +1,9 @@
 <?php
 include('../bd.php');
 
-$ordenDeseado = ['Animes', 'Series', 'Mangas', 'Películas'];
+$ordenDeseado = 
+[ 'Animes', 'Series', 'Mangas', 'Películas' ]
+;
 
 $mapaExists = [
     'Series' => "EXISTS (SELECT 1 FROM series WHERE Estado = 'Viendo')",
@@ -270,12 +272,16 @@ $actual = $modulosOrdenados[0] ?? null;
 
 $siguienteModulo = obtenerSiguienteModulo($actual['modulo'], $ordenDeseado);
 
-function siguienteAnime(mysqli $conexion): ?string
+function siguienteAnime(mysqli $conexion): ?array
 {
     $sql = "
-        SELECT Nombre, pendientes.Temporada, pendientes.Total, pendientes.Vistos
+        SELECT 
+            anime.Nombre,
+            pendientes.Temporada,
+            pendientes.Total,
+            pendientes.Vistos
         FROM anime
-        INNER JOIN pendientes ON pendientes.ID_Anime=anime.id
+        INNER JOIN pendientes ON pendientes.ID_Anime = anime.id
         WHERE pendientes.Tipo != 'Pelicula'
         ORDER BY pendientes.Pendientes ASC
         LIMIT 1;
@@ -284,17 +290,34 @@ function siguienteAnime(mysqli $conexion): ?string
     $r = mysqli_query($conexion, $sql);
     if (!$row = mysqli_fetch_assoc($r)) return null;
 
-    // 🔹 Determinar temporada actual o siguiente
-    if ($row['Vistos'] >= $row['Total']) {
-        $texto = "(Completo)";
+    $vistos = (int)$row['Vistos'];
+    $total  = (int)$row['Total'];
+
+    // 🔹 Texto estado
+    if ($vistos >= $total) {
+        $estadoTexto = '(Completo)';
     } else {
-        $texto = "";
+        $estadoTexto = '';
     }
 
-    return "{$row['Nombre']} {$row['Temporada']} - {$row['Vistos']}/{$row['Total']} $texto";
+    // 🔹 Texto visible principal
+    $siguienteTexto = "{$row['Nombre']} {$row['Temporada']} — {$vistos}/{$total} {$estadoTexto}";
+
+    return [
+        'nombre'         => $row['Nombre'],
+        'modulo'         => 'Animes',
+        'temporada'      => $row['Temporada'],
+        'vistos'         => $vistos,
+        'total'          => $total,
+        'icono'          => 'fa-dragon',
+        'titulo'         => 'Anime',
+        'color'          => '#f8961e',
+        'siguienteTexto' => $siguienteTexto,
+        'porcentaje'     => $total > 0 ? round(($vistos / $total) * 100) : 0
+    ];
 }
 
-function siguienteBloqueSeries(mysqli $conexion): ?string
+function siguienteBloqueSeries(mysqli $conexion): ?array
 {
     $sql = "
         SELECT Nombre, Temporadas, Total, Vistos
@@ -322,89 +345,123 @@ function siguienteBloqueSeries(mysqli $conexion): ?string
     if ($row['Vistos'] >= $row['Total']) {
         $temporada = $row['Temporadas'] + 1;
         $bloque = 1;
-        $texto = "Inicio de";
+        $texto = "Próxima temporada";
     } else {
         $temporada = $row['Temporadas'];
         $texto = "";
     }
 
-
-    return "{$row['Nombre']} ($texto T{$temporada}) - Bloque {$bloque} · {$tamBloque} eps";
+    // 🔹 Retornar como array asociativo
+    return [
+        'nombre'     => $row['Nombre'],
+        'temporada'  => $temporada,
+        'bloque'     => $bloque,
+        'tamBloque'  => $tamBloque,
+        'texto'      => $texto,
+        'vistos'     => $row['Vistos'],
+        'icono'     => 'fa-tv',
+        'titulo' => 'Serie',
+        'color'     => '#4361ee',
+        'total'      => $row['Total'],
+        'siguienteTexto' => $row['Nombre'] . "($texto T{$temporada}) - Bloque {$bloque} · {$tamBloque} eps",
+        'porcentaje' => round(($row['Vistos'] / $row['Total']) * 100)
+    ];
 }
 
-
-function siguienteHitoManga(mysqli $conexion): ?string
+function siguienteHitoManga(mysqli $conexion): ?array
 {
     $sql = "
         SELECT 
             manga.Nombre,
-            manga.`Capitulos Vistos` as vistos,
-            manga.`Capitulos Totales` as totales,
+            manga.`Capitulos Vistos` AS vistos,
+            manga.`Capitulos Totales` AS totales,
             manga.Faltantes,
             manga.Estado
         FROM manga
-        LEFT JOIN `tachiyomi` ON manga.ID = tachiyomi.ID_Manga 
-        WHERE tachiyomi.ID_Manga IS NULL AND manga.Faltantes > 0
+        LEFT JOIN tachiyomi ON manga.ID = tachiyomi.ID_Manga
+        WHERE tachiyomi.ID_Manga IS NULL
+          AND manga.Faltantes > 0
         ORDER BY manga.Cantidad DESC
-        LIMIT 1;
+        LIMIT 1
     ";
 
     $r = mysqli_query($conexion, $sql);
     if (!$row = mysqli_fetch_assoc($r)) return null;
 
+    $vistos = $row['vistos'];
+    $totales = $row['totales'];
     $tamHito = 50;
 
-    // Calcular hito actual
-    $hito = floor($row['vistos'] / $tamHito) + 1;
+    // 🔹 Hito actual
+    $hito = floor($vistos / $tamHito) + 1;
 
-    if ($row['Estado'] == 'Finalizado') {
-        return "{$row['Nombre']} — {$row['vistos']} / {$row['totales']} caps (Final) — Hito {$hito}";
+    // 🔹 Definir hasta dónde mostrar el progreso
+    if ($row['Estado'] === 'Finalizado') {
+        $mostrarHasta = $totales;
+        $estadoTexto = '(Finalizado)';
     } else {
-        // Siguiente hito
-        $siguienteHito = ceil(($row['vistos'] + 1) / $tamHito) * $tamHito;
-        $mostrarHasta = min($siguienteHito, $row['totales']);
-        return "{$row['Nombre']} — {$row['vistos']} / {$mostrarHasta} caps — Hito {$hito}";
+        $siguienteHito = ceil(($vistos + 1) / $tamHito) * $tamHito;
+        $mostrarHasta = min($siguienteHito, $totales);
+        $estadoTexto = '(En emisión)';
     }
+
+    // 🔹 Texto final
+    $siguienteTexto = "{$row['Nombre']} — {$vistos} / {$mostrarHasta} caps — Hito {$hito} {$estadoTexto}";
+
+    // 🔹 Porcentaje (seguro)
+    $porcentaje = ($mostrarHasta > 0)
+        ? round(($vistos / $mostrarHasta) * 100)
+        : 0;
+
+    return [
+        'nombre'          => $row['Nombre'],
+        'modulo'          => 'Mangas',
+        'hito'            => $hito,
+        'vistos'          => $vistos,
+        'total'           => $mostrarHasta,
+        'icono'           => 'fa-book-open',
+        'titulo'          => 'Manga',
+        'color'           => '#7209b7',
+        'siguienteTexto'  => $siguienteTexto,
+        'porcentaje'      => $porcentaje
+    ];
 }
 
 
-
-function siguientePelicula(mysqli $conexion): ?string
+function siguientePelicula(mysqli $conexion): ?array
 {
     $sql = "
-    SELECT 
-        CONCAT_WS(' ', anime.Nombre, peliculas.Nombre) AS Nombre
-    FROM peliculas
-    LEFT JOIN anime ON peliculas.ID_Anime = anime.id
-    WHERE peliculas.Estado = 'Pendiente'
-    ORDER BY peliculas.ID ASC
-    LIMIT 1;
+        SELECT 
+            CONCAT_WS(' ', anime.Nombre, peliculas.Nombre) AS nombre,
+            peliculas.Estado
+        FROM peliculas
+        LEFT JOIN anime ON peliculas.ID_Anime = anime.id
+        WHERE peliculas.Estado IN ('Pendiente','Viendo')
+        ORDER BY peliculas.ID ASC
+        LIMIT 1
     ";
 
     $r = mysqli_query($conexion, $sql);
     if (!$row = mysqli_fetch_assoc($r)) return null;
 
-    return $row['Nombre'];
-}
+    // 🔹 Películas no tienen bloques ni hitos
+    $vistos = ($row['Estado'] === 'Viendo') ? 1 : 0;
+    $total  = 1;
 
-$siguienteTexto = null;
+    // 🔹 Texto visible
+    $siguienteTexto = "{$row['nombre']} — Pendiente";
 
-switch ($siguienteModulo) {
-    case 'Animes':
-        $siguienteTexto = siguienteAnime($conexion);
-        break;
-
-    case 'Series':
-        $siguienteTexto = siguienteBloqueSeries($conexion);
-        break;
-
-    case 'Mangas':
-        $siguienteTexto = siguienteHitoManga($conexion);
-        break;
-
-    case 'Películas':
-        $siguienteTexto = siguientePelicula($conexion);
-        break;
+    return [
+        'nombre'          => $row['nombre'],
+        'modulo'          => 'Películas',
+        'vistos'          => $vistos,
+        'total'           => $total,
+        'icono'           => 'fa-film',
+        'titulo'          => 'Película',
+        'color'           => '#f72585',
+        'siguienteTexto'  => $siguienteTexto,
+        'porcentaje'      => round(($vistos / $total) * 100)
+    ];
 }
 
 
@@ -751,6 +808,27 @@ switch ($siguienteModulo) {
             color: #555;
             margin-top: 3px;
         }
+
+        .progress-container-2 {
+            width: 100%;
+            height: 10px;
+            background: #e5e7eb;
+            border-radius: 8px;
+            margin-top: 6px;
+            overflow: hidden;
+        }
+
+        .progress-bar-2 {
+            height: 10px;
+            border-radius: 8px;
+            transition: width 0.4s ease;
+        }
+
+        .progress-text-2 {
+            font-size: 0.75rem;
+            color: #555;
+            margin-top: 4px;
+        }
     </style>
 </head>
 
@@ -1057,60 +1135,101 @@ switch ($siguienteModulo) {
     ?>
 
     <?php
-    // Reordenar módulos para que el siguiente al actual vaya primero
     $siguienteModuloArray = [];
     $otrosModulos = [];
     $encontrado = false;
+    $hayModuloActual = false;
 
     foreach ($pendientes as $item) {
+        if ($item['texto'] === $viendo) {
+            $encontrado = true;
+            $hayModuloActual = true;
+            continue; // no incluir el módulo actual
+        }
+
         if ($encontrado) {
             $siguienteModuloArray[] = $item;
-        } elseif ($item['texto'] == $viendo) {
-            $encontrado = true;
         } else {
             $otrosModulos[] = $item;
         }
     }
 
-    // Combinar: siguiente al actual primero, luego los demás
-    $ordenFinal = array_merge($siguienteModuloArray, $otrosModulos);
+    // Si no se encontró el módulo actual, mantener orden original
+    $ordenFinal = $hayModuloActual
+        ? array_merge($siguienteModuloArray, $otrosModulos)
+        : $pendientes;
 
-    // Generar el detalle de “siguiente” para cada módulo
-    foreach ($ordenFinal as &$item) {
-        switch ($item['texto']) {
-            case 'Animes':
-                $item['siguienteTexto'] = siguienteAnime($conexion);
-                break;
-            case 'Series':
-                $item['siguienteTexto'] = siguienteBloqueSeries($conexion);
-                break;
-            case 'Mangas':
-                $item['siguienteTexto'] = siguienteHitoManga($conexion);
-                break;
-            case 'Películas':
-                $item['siguienteTexto'] = siguientePelicula($conexion);
-                break;
-            default:
-                $item['siguienteTexto'] = '';
+    $mapaFunciones = [
+        'Animes'     => 'siguienteAnime',
+        'Series'     => 'siguienteBloqueSeries',
+        'Mangas'     => 'siguienteHitoManga',
+        'Películas'  => 'siguientePelicula'
+    ];
+
+    $consumos = [];
+
+    foreach ($ordenFinal as $item) {
+        $texto = $item['texto'];
+
+        // Saltar si es el módulo actual
+        if ($texto === $viendo) {
+            continue;
+        }
+
+        // Saltar si no hay función definida
+        if (!isset($mapaFunciones[$texto])) {
+            continue;
+        }
+
+        $funcion = $mapaFunciones[$texto];
+
+        // Ejecutar función
+        $resultado = $funcion($conexion);
+
+        // Validar resultado
+        if (is_array($resultado) && !empty($resultado)) {
+            $consumos[] = $resultado;
         }
     }
-    unset($item); // romper referencia
+
+
     ?>
 
     <?php if (!empty($ordenFinal)): ?>
         <div class="siguiente-consumo-container">
-            <?php foreach ($ordenFinal as $item): ?>
+            <?php foreach ($consumos as $item): ?>
                 <div class="siguiente-consumo-item" style="border-left: 5px solid <?= $item['color'] ?>;">
+
                     <span class="siguiente-label" style="color: <?= $item['color'] ?>;">
-                        <i class="fas <?= $item['icon'] ?>" style="margin-right:6px;"></i>
-                        <?= rtrim($item['texto'], 's') ?>:
+                        <i class="fas <?= $item['icono'] ?>" style="margin-right:6px;"></i>
+                        <?= $item['titulo'] ?>:
                     </span>
+
                     <div class="siguiente-detalle">
-                        <?= $item['siguienteTexto'] ?: ($item['label'] . ' — ' . $item['valor']) ?>
+                        <?= $item['siguienteTexto'] ?>
                     </div>
+
+                    <!-- Barra de progreso -->
+                    <div class="progress-container-2">
+                        <div
+                            class="progress-bar-2"
+                            style="
+                    width: <?= $item['porcentaje'] ?>%;
+                    background-color: <?= $item['color'] ?>;">
+                        </div>
+                    </div>
+
+                    <div class="progress-text-2">
+                        <?= $item['vistos'] ?> / <?= $item['total'] ?> · <?= $item['porcentaje'] ?>%
+                    </div>
+
                 </div>
             <?php endforeach; ?>
+
+
         </div>
+
+
     <?php endif; ?>
 
 

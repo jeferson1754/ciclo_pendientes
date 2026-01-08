@@ -449,7 +449,7 @@ function siguientePelicula(mysqli $conexion): ?array
     $total  = 1;
 
     // 🔹 Texto visible
-    $siguienteTexto = "{$row['nombre']} — Pendiente";
+    $siguienteTexto = "{$row['nombre']}";
 
     return [
         'nombre'          => $row['nombre'],

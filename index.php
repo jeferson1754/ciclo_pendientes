@@ -1,9 +1,12 @@
 <?php
 include('../bd.php');
 
-$ordenDeseado = 
-[ 'Animes', 'Series', 'Mangas', 'Películas' ]
-;
+$ordenDeseado =
+    ['Animes', 'Series', 'Mangas', 'Películas'];
+
+$bloque_series = 6;
+
+$tamaño_serie_larga = 10;
 
 $mapaExists = [
     'Series' => "EXISTS (SELECT 1 FROM series WHERE Estado = 'Viendo')",
@@ -34,7 +37,7 @@ SELECT
         SUM(
             CASE 
                 WHEN (Total - Vistos) > 0 
-                THEN (Total - Vistos) / 5
+                THEN (Total - Vistos) / $bloque_series
                 ELSE 0
             END
         )) AS bloques_series
@@ -317,7 +320,7 @@ function siguienteAnime(mysqli $conexion): ?array
     ];
 }
 
-function siguienteBloqueSeries(mysqli $conexion): ?array
+function siguienteBloqueSeries(mysqli $conexion, $bloque_series=6, $serie_larga=10): ?array
 {
     $sql = "
         SELECT Nombre, Temporadas, Total, Vistos
@@ -331,13 +334,13 @@ function siguienteBloqueSeries(mysqli $conexion): ?array
     if (!$row = mysqli_fetch_assoc($r)) return null;
 
     // 🔹 Regla de bloques
-    if ($row['Total'] <= 8) {
+    if ($row['Total'] <= $serie_larga) {
         // Temporada corta → 1 bloque = temporada completa
         $tamBloque = $row['Total'];
         $bloque = 1;
     } else {
-        // Temporada larga → bloques de 5 episodios
-        $tamBloque = 5;
+        // Temporada mediana/larga → bloques de 6 episodios
+        $tamBloque = $bloque_series;
         $bloque = floor($row['Vistos'] / $tamBloque) + 1;
     }
 
@@ -346,6 +349,7 @@ function siguienteBloqueSeries(mysqli $conexion): ?array
         $temporada = $row['Temporadas'] + 1;
         $bloque = 1;
         $texto = "Próxima temporada";
+        $row['Vistos'] = 0;
     } else {
         $temporada = $row['Temporadas'];
         $texto = "";

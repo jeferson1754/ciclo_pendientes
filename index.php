@@ -230,7 +230,7 @@ LIMIT 1;
 
 $sql_peliculas = "SELECT 
     'Películas' AS modulo,
-    CONCAT_WS(' - ', anime.Nombre, peliculas.Nombre) AS Nombre,
+    CONCAT_WS(' ', anime.Nombre, peliculas.Nombre) AS Nombre,
     '' AS detalle,
     0 AS vistos,
     0 AS total,

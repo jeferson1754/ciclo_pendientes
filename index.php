@@ -189,7 +189,8 @@ LIMIT 1;
 ";
 
 $sql_anime = "SELECT 'Animes' AS modulo, 
-Nombre, Temporadas as detalle,
+    CONCAT_WS('', anime.Nombre, pendientes.Temporada) AS Nombre,
+ pendientes.Temporada as detalle,
  pendientes.Vistos as vistos,
   pendientes.Total as total,
   'fa-dragon' as icono,
@@ -320,7 +321,7 @@ function siguienteAnime(mysqli $conexion): ?array
     ];
 }
 
-function siguienteBloqueSeries(mysqli $conexion, $bloque_series=6, $serie_larga=10): ?array
+function siguienteBloqueSeries(mysqli $conexion, $bloque_series = 6, $serie_larga = 10): ?array
 {
     $sql = "
         SELECT Nombre, Temporadas, Total, Vistos

@@ -178,15 +178,20 @@ $icono_mangas = obtenerIconoCambio($mangas, $mangas_anterior);
 $icono_peliculas = obtenerIconoCambio($peliculas, $peliculas_anterior);
 $icono_animes = obtenerIconoCambio($animes, $animes_anterior);
 
-$sql_series = "SELECT 'Series' AS modulo,
- Nombre,CONCAT('Temporada ', Temporadas) AS detalle,
- Vistos as vistos, Total As total, 
-'fa-tv' as icono,
- Total AS tipo
+$sql_series = "SELECT 
+    'Series' AS modulo,
+    CASE 
+        WHEN Temporadas > 1 THEN CONCAT(Nombre, ' T', Temporadas)
+        ELSE Nombre 
+    END AS Nombre,
+    CONCAT('Temporada ', Temporadas) AS detalle,
+    Vistos AS vistos, 
+    Total AS total, 
+    'fa-tv' AS icono,
+    Total AS tipo
 FROM `series`
 WHERE Estado='Viendo'
-LIMIT 1;
-";
+LIMIT 1;";
 
 $sql_anime = "SELECT 'Animes' AS modulo, 
     CONCAT_WS('', anime.Nombre, pendientes.Temporada) AS Nombre,
@@ -855,7 +860,7 @@ function siguientePelicula(mysqli $conexion): ?array
                     <?= obtenerVerboModulo($actual['modulo']); ?>
                 </span>
                 <span class="viendo-nombre">
-                    <span title="<?= htmlspecialchars($actual['Nombre']) ?>">
+                    <span title="<?= htmlspecialchars($actual['Nombre']) ?> - <?= htmlspecialchars($actual['detalle']) ?>">
                         <?= limitarCaracteres($actual['Nombre'], 50); ?>
                     </span>
 

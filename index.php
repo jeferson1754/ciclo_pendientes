@@ -521,6 +521,22 @@ function siguientePelicula(mysqli $conexion): ?array
             width: 100%;
         }
 
+        .viendo-fase {
+            display: block;
+            font-size: 0.8rem;
+            margin-top: 4px;
+            opacity: 0.85;
+        }
+
+        .viendo-fase.zona_cierre {
+            color: #f39c12;
+        }
+
+        .viendo-fase.cierre_recomendado {
+            color: #27ae60;
+        }
+
+
         .dashboard-header h1 {
             font-weight: 600;
             color: var(--primary-color);
@@ -839,6 +855,13 @@ function siguientePelicula(mysqli $conexion): ?array
             color: #555;
             margin-top: 4px;
         }
+
+        .viendo-hasta {
+            font-size: 0.85rem;
+            color: #6c757d;
+            margin-top: 2px;
+            display: block;
+        }
     </style>
 </head>
 
@@ -848,7 +871,54 @@ function siguientePelicula(mysqli $conexion): ?array
         <p>Visualiza tus series, películas, mangas y animes pendientes en un círculo interactivo</p>
     </div>
 
-    <?php if ($actual): ?>
+
+
+    <?php if ($actual):
+
+        $hastaEp = null;
+
+        $faseSerie = null;
+
+        if ($actual && $actual['modulo'] === 'Series' && !empty($actual['total'])) {
+
+            $vistos = (int)$actual['vistos'];
+            $total  = (int)$actual['total'];
+
+            // 🟡 Serie corta → temporada completa
+            if ($total <= $tamaño_serie_larga) {
+
+                $hastaEp = $total;
+            }
+            // 🔵 Serie media o larga → bloques
+            else {
+
+                $bloque = floor($vistos / $bloque_series) + 1;
+                $hastaEp = min($bloque * $bloque_series, $total);
+            }
+
+            $porcentaje = round(($actual['vistos'] / $actual['total']) * 100);
+
+            if ($porcentaje <= 30) {
+                $faseSerie = 'exploracion';
+            } elseif ($porcentaje <= 49) {
+                $faseSerie = 'progreso';
+            } elseif ($porcentaje <= 69) {
+                $faseSerie = 'zona_cierre';
+            } else {
+                $faseSerie = 'cierre_recomendado';
+            }
+
+            // 🟢 Si estás en zona de cierre o cierre recomendado, el objetivo es el final
+            if ($faseSerie === 'zona_cierre' || $faseSerie === 'cierre_recomendado') {
+                $hastaEp = $total;
+            }
+        }
+
+
+
+
+    ?>
+
         <div class="viendo-header">
             <span class="viendo-icon"
                 style="background-color: var(--<?= $actual['modulo']; ?>)">
@@ -859,8 +929,18 @@ function siguientePelicula(mysqli $conexion): ?array
                 <span class="viendo-label">
                     <?= obtenerVerboModulo($actual['modulo']); ?>
                 </span>
-                <span class="viendo-nombre">
-                    <span title="<?= htmlspecialchars($actual['Nombre']) ?> - <?= htmlspecialchars($actual['detalle']) ?>">
+
+                <?php
+                $title = $actual['Nombre'];
+
+                if (!empty($actual['detalle'])) {
+                    $title .= ' - ' . $actual['detalle'];
+                }
+                ?>
+
+                <span
+                    class="viendo-nombre">
+                    <span title="<?= htmlspecialchars($title) ?>">
                         <?= limitarCaracteres($actual['Nombre'], 50); ?>
                     </span>
 
@@ -870,6 +950,45 @@ function siguientePelicula(mysqli $conexion): ?array
                         </span>
                     <?php endif; ?>
                 </span>
+
+                <?php if ($faseSerie): ?>
+                    <span
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                        class="viendo-fase <?= $faseSerie ?>"
+                        title="<?php
+                                echo match ($faseSerie) {
+                                    'exploracion' =>
+                                    'Estás probando la serie. Cambiar de módulo es totalmente válido.',
+                                    'progreso' =>
+                                    'La serie ya está en progreso. Puedes rotar de módulo si lo necesitas.',
+                                    'zona_cierre' =>
+                                    'Ahora no es recomendable cambiar de módulo. Es más eficiente terminar la serie.',
+                                    'cierre_recomendado' =>
+                                    'Cierre recomendado. Terminar la serie ahora es la opción más eficiente.',
+                                };
+                                ?>">
+                        <?php
+                        echo match ($faseSerie) {
+                            'exploracion'        => '🟤 Exploración',
+                            'progreso'           => '🔵 En progreso',
+                            'zona_cierre'        => '🟠 Zona de cierre',
+                            'cierre_recomendado' => '🟢 Cierre recomendado',
+                        };
+                        ?>
+                        <?php if ($porcentaje !== null): ?>
+                            (<?= $porcentaje ?>%)
+                        <?php endif; ?>
+                    </span>
+                <?php endif; ?>
+
+
+
+                <?php if ($hastaEp): ?>
+                    <span class="viendo-hasta">
+                        → Hasta ep <?= $hastaEp ?>
+                    </span>
+                <?php endif; ?>
             </div>
         </div>
     <?php endif; ?>

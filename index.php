@@ -8,6 +8,8 @@ $bloque_series = 6;
 
 $tamaño_serie_larga = 10;
 
+$tamaño_hito_manga = 50;
+
 $mapaExists = [
     'Series' => "EXISTS (SELECT 1 FROM series WHERE Estado = 'Viendo')",
     'Mangas' => "EXISTS (
@@ -398,27 +400,32 @@ function siguienteHitoManga(mysqli $conexion): ?array
     $r = mysqli_query($conexion, $sql);
     if (!$row = mysqli_fetch_assoc($r)) return null;
 
-    $vistos = $row['vistos'];
-    $totales = $row['totales'];
+    $vistos  = (int)$row['vistos'];
+    $totales = (int)$row['totales'];
     $tamHito = 50;
 
     // 🔹 Hito actual
-    $hito = floor($vistos / $tamHito) + 1;
+    $hito = max(1, floor($vistos / $tamHito) + 1);
 
-    // 🔹 Definir hasta dónde mostrar el progreso
     if ($row['Estado'] === 'Finalizado') {
+
         $mostrarHasta = $totales;
         $estadoTexto = '(Finalizado)';
     } else {
+
         $siguienteHito = ceil(($vistos + 1) / $tamHito) * $tamHito;
-        $mostrarHasta = min($siguienteHito, $totales);
+
+        if ($totales > 0) {
+            $mostrarHasta = min($siguienteHito, $totales);
+        } else {
+            $mostrarHasta = $siguienteHito;
+        }
+
         $estadoTexto = '(En emisión)';
     }
 
-    // 🔹 Texto final
     $siguienteTexto = "{$row['Nombre']} — {$vistos} / {$mostrarHasta} caps — Hito {$hito} {$estadoTexto}";
 
-    // 🔹 Porcentaje (seguro)
     $porcentaje = ($mostrarHasta > 0)
         ? round(($vistos / $mostrarHasta) * 100)
         : 0;
@@ -441,14 +448,28 @@ function siguienteHitoManga(mysqli $conexion): ?array
 function siguientePelicula(mysqli $conexion): ?array
 {
     $sql = "
-        SELECT 
+      SELECT 
             CONCAT_WS(' ', anime.Nombre, peliculas.Nombre) AS nombre,
-            peliculas.Estado
+            peliculas.Estado,
+            -- Traemos el progreso del anime vinculado
+           COALESCE(
+                (SELECT (Vistos/Total)*100 FROM pendientes WHERE ID_Anime = anime.id AND pendientes.Tipo NOT IN ('Pelicula') LIMIT 1), 
+                100
+            ) as progreso_anime
         FROM peliculas
         LEFT JOIN anime ON peliculas.ID_Anime = anime.id
         WHERE peliculas.Estado IN ('Pendiente','Viendo')
+		-- REGLA: Mostrar si el progreso del anime es >= 90% o si no tiene dependencia (100)
+        AND (
+            peliculas.ID_Anime IS NULL 
+            OR 
+            COALESCE(
+                (SELECT (Vistos/Total)*100 FROM pendientes WHERE ID_Anime = anime.id AND pendientes.Tipo NOT IN ('Pelicula') LIMIT 1), 
+                100
+            ) >= 90
+        )
         ORDER BY peliculas.ID ASC
-        LIMIT 1
+        LIMIT 1;
     ";
 
     $r = mysqli_query($conexion, $sql);
@@ -473,7 +494,6 @@ function siguientePelicula(mysqli $conexion): ?array
         'porcentaje'      => round(($vistos / $total) * 100)
     ];
 }
-
 
 ?>
 
@@ -898,11 +918,11 @@ function siguientePelicula(mysqli $conexion): ?array
 
             $porcentaje = round(($actual['vistos'] / $actual['total']) * 100);
 
-            if ($porcentaje <= 30) {
+            if ($porcentaje <= 25) {
                 $faseSerie = 'exploracion';
-            } elseif ($porcentaje <= 49) {
+            } elseif ($porcentaje <= 70) {
                 $faseSerie = 'progreso';
-            } elseif ($porcentaje <= 69) {
+            } elseif ($porcentaje <= 90) {
                 $faseSerie = 'zona_cierre';
             } else {
                 $faseSerie = 'cierre_recomendado';
@@ -913,6 +933,46 @@ function siguientePelicula(mysqli $conexion): ?array
                 $hastaEp = $total;
             }
         }
+
+        $hastaCap = null;
+
+        $faseManga = null;
+
+        if ($actual && $actual['modulo'] === 'Mangas' && !empty($actual['total'])) {
+
+            $vistos = (int)$actual['vistos'];
+            $total  = (int)$actual['total'];
+
+            // 🟡 Serie corta → temporada completa
+            if ($total <= $tamaño_hito_manga) {
+
+                $hastaCap = $total;
+            }
+            // 🔵 Serie media o larga → bloques
+            else {
+
+                $hito = floor($vistos / $tamaño_hito_manga) + 1;
+                $hastaCap = min($hito * $tamaño_hito_manga, $total);
+            }
+
+            $porcentaje = round(($actual['vistos'] / $actual['total']) * 100);
+
+            if ($porcentaje <= 25) {
+                $faseManga = 'exploracion';
+            } elseif ($porcentaje <= 70) {
+                $faseManga = 'progreso';
+            } elseif ($porcentaje <= 90) {
+                $faseManga = 'zona_cierre';
+            } else {
+                $faseManga = 'cierre_recomendado';
+            }
+
+            // 🟢 Si estás en zona de cierre o cierre recomendado, el objetivo es el final
+            if ($faseManga === 'zona_cierre' || $faseManga === 'cierre_recomendado') {
+                $hastaCap = $total;
+            }
+        }
+
 
 
 
@@ -989,6 +1049,48 @@ function siguientePelicula(mysqli $conexion): ?array
                         → Hasta ep <?= $hastaEp ?>
                     </span>
                 <?php endif; ?>
+
+                <?php if ($faseManga): ?>
+                    <span
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                        class="viendo-fase <?= $faseManga ?>"
+                        title="<?php
+                                echo match ($faseManga) {
+                                    'exploracion' =>
+                                    'Estás probando el manga. Cambiar de módulo es totalmente válido.',
+                                    'progreso' =>
+                                    'El manga ya está en progreso. Puedes rotar de módulo si lo necesitas.',
+                                    'zona_cierre' =>
+                                    'Ahora no es recomendable cambiar de módulo. Es más eficiente terminar el manga.',
+                                    'cierre_recomendado' =>
+                                    'Cierre recomendado. Terminar el manga ahora es la opción más eficiente.',
+                                };
+                                ?>">
+                        <?php
+                        echo match ($faseManga) {
+                            'exploracion'        => '🟤 Exploración',
+                            'progreso'           => '🔵 En progreso',
+                            'zona_cierre'        => '🟠 Zona de cierre',
+                            'cierre_recomendado' => '🟢 Cierre recomendado',
+                        };
+                        ?>
+                        <?php if ($porcentaje !== null): ?>
+                            (<?= $porcentaje ?>%)
+                        <?php endif; ?>
+                    </span>
+                <?php endif; ?>
+
+
+
+                <?php if ($hastaCap): ?>
+                    <span class="viendo-hasta">
+                        → Hasta cap <?= $hastaCap ?>
+                    </span>
+                <?php endif; ?>
+
+
+
             </div>
         </div>
     <?php endif; ?>

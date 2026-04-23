@@ -197,16 +197,16 @@ LIMIT 1;";
 
 $sql_anime = "SELECT 'Animes' AS modulo, 
     CONCAT_WS('', anime.Nombre, pendientes.Temporada) AS Nombre,
- pendientes.Temporada as detalle,
- pendientes.Vistos as vistos,
-  pendientes.Total as total,
-  'fa-dragon' as icono,
- pendientes.Total as tipo
+    pendientes.Temporada as detalle,
+    pendientes.Vistos as vístos,
+    pendientes.Total as total,
+    'fa-dragon' as icono,
+    pendientes.Total as tipo
 FROM anime
-INNER JOIN pendientes ON anime.id= pendientes.ID_Anime
+INNER JOIN pendientes ON anime.id = pendientes.ID_Anime
 WHERE anime.Estado = 'Viendo'
-LIMIT 1;
-";
+ORDER BY pendientes.orden_historia ASC -- Asegura que el 'viendo' sea el primero de la historia
+LIMIT 1;";
 
 $sql_manga = "SELECT 
     'Mangas' AS modulo,
@@ -294,7 +294,10 @@ function siguienteAnime(mysqli $conexion): ?array
         FROM anime
         INNER JOIN pendientes ON pendientes.ID_Anime = anime.id
         WHERE pendientes.Tipo != 'Pelicula'
-        ORDER BY pendientes.Pendientes ASC
+        ORDER BY 
+            pendientes.ID_Anime ASC,       -- Mantiene la franquicia unida
+            pendientes.orden_historia ASC,  -- Prioriza el orden de la historia
+            pendientes.Pendientes ASC       -- Luego por los que tengan menos pendientes
         LIMIT 1;
     ";
 

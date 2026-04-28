@@ -198,7 +198,7 @@ LIMIT 1;";
 $sql_anime = "SELECT 'Animes' AS modulo, 
     CONCAT_WS('', anime.Nombre, pendientes.Temporada) AS Nombre,
     pendientes.Temporada as detalle,
-    pendientes.Vistos as vístos,
+    pendientes.Vistos as vistos,
     pendientes.Total as total,
     'fa-dragon' as icono,
     pendientes.Total as tipo
@@ -885,15 +885,66 @@ function siguientePelicula(mysqli $conexion): ?array
             margin-top: 2px;
             display: block;
         }
+
+        .dashboard-header {
+            position: relative;
+            padding-right: 120px;
+            /* Espacio para que el texto no choque con el botón */
+        }
+
+        .btn-dashboard-top {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #36A2EB;
+            padding: 10px 18px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            backdrop-filter: blur(5px);
+        }
+
+        .btn-dashboard-top:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #36A2EB;
+            /* Color de tus series para resaltar */
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Ajuste para móviles */
+        @media (max-width: 768px) {
+            .btn-dashboard-top {
+                top: 10px;
+                right: 10px;
+                padding: 8px 12px;
+                font-size: 0.8rem;
+            }
+
+            .btn-dashboard-top span {
+                display: none;
+                /* Podrías envolver el texto en un span para ocultarlo */
+            }
+        }
     </style>
 </head>
 
 <body>
-    <div class="dashboard-header">
+    <div class="dashboard-header" style="position: relative;">
         <h1>Mi Ciclo de Pendientes</h1>
         <p>Visualiza tus series, películas, mangas y animes pendientes en un círculo interactivo</p>
     </div>
 
+    <a href="historial.php" class="btn-dashboard-top">
+        <i class="fas fa-th-large"></i> Dashboard
+    </a>
 
 
     <?php if ($actual):

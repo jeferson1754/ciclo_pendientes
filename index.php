@@ -49,13 +49,13 @@ SELECT
     ) AS series,
 
     -- MANGAS: hitos pendientes
-    (SELECT CEIL(SUM(Faltantes)/50)
-     FROM manga
+    (SELECT SUM(CEIL(Faltantes / 50)) 
+    FROM manga 
      WHERE Faltantes > 0
     ) AS mangas,
 
     -- WEBTOONS: hitos pendientes
-    (SELECT CEIL(SUM(Faltantes)/50)
+    (SELECT SUM(CEIL(Faltantes / 50))
      FROM webtoon
      WHERE Faltantes > 0
     ) AS webtoons,

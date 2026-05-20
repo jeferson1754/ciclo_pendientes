@@ -661,10 +661,10 @@ $totalGeneral = array_sum($totalesUltimoMes);
                 $pct = $t['pct'];
                 $diff = $t['diff'];
                 if ($pct > 0) {
-                    $badgeClass = 'badge-up';
+                    $badgeClass = 'badge-down';
                     $arrow = '↑';
                 } elseif ($pct < 0) {
-                    $badgeClass = 'badge-down';
+                    $badgeClass = 'badge-up';
                     $arrow = '↓';
                 } else {
                     $badgeClass = 'badge-flat';
@@ -774,7 +774,7 @@ $totalGeneral = array_sum($totalesUltimoMes);
                             </div>
                         </div>
                         <?php if ($trend['pct'] != 0): ?>
-                            <span style="font-family:var(--font-display);font-size:11px;color:<?= $trend['pct'] > 0 ? '#4ade80' : '#f87171' ?>">
+                            <span style="font-family:var(--font-display);font-size:11px;color:<?= $trend['pct'] > 0 ? '#f87171' : '#4ade80' ?>">
                                 <?= $trend['pct'] > 0 ? '↑' : '↓' ?> <?= abs($trend['pct']) ?>%
                             </span>
                         <?php endif; ?>

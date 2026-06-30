@@ -281,7 +281,24 @@ foreach ($ordenDeseado as $nombre) {
 
 $actual = $modulosOrdenados[0] ?? null;
 
+// Si no estás viendo nada, forzamos un estado amigable para el sistema
+if ($viendo === 'Ninguno') {
+    $viendo = 'Ninguno'; // O el módulo con el que prefieras reiniciar el ciclo por defecto
+
+    // Creamos un registro ficticio para que el diseño superior no se rompa
+    $actual = [
+        'modulo' => 'Ninguno',
+        'Nombre' => '¡Ciclo Completado! Elige tu próximo objetivo',
+        'detalle' => 'Ningún módulo activo',
+        'vistos' => 0,
+        'total' => 0,
+        'icono' => 'fa-star',
+        'tipo' => '',
+    ];
+}
+
 $siguienteModulo = obtenerSiguienteModulo($actual['modulo'], $ordenDeseado);
+
 
 function siguienteAnime(mysqli $conexion): ?array
 {
@@ -530,6 +547,7 @@ function siguientePelicula(mysqli $conexion): ?array
             --Mangas: #7209b7;
             --Películas: #f72585;
             --Animes: #f8961e;
+            --Ninguno: #2b2d42;
         }
 
         body {
@@ -1403,8 +1421,6 @@ function siguientePelicula(mysqli $conexion): ?array
 
 
     <?php
-    // $pendientes = array de módulos con ['texto', 'label', 'valor', 'color', 'icon', 'link']
-    // $viendo = módulo actual (ej: 'Animes')
 
     // Reordenar módulos para que el siguiente al actual vaya primero
     $siguienteModuloArray = [];

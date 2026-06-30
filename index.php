@@ -290,14 +290,20 @@ function siguienteAnime(mysqli $conexion): ?array
             anime.Nombre,
             pendientes.Temporada,
             pendientes.Total,
-            pendientes.Vistos
+            pendientes.Vistos,
+            ROW_NUMBER() OVER(
+                PARTITION BY pendientes.Tipo 
+                ORDER BY pendientes.Pendientes ASC, pendientes.ID ASC
+            ) AS secuencia_intercalado
         FROM anime
         INNER JOIN pendientes ON pendientes.ID_Anime = anime.id
-        WHERE pendientes.Tipo != 'Pelicula'
+        WHERE pendientes.Tipo IN ('Ova y Otros', 'Anime') 
+            AND pendientes.ID > 1 
         ORDER BY 
-            pendientes.ID_Anime ASC,       -- Mantiene la franquicia unida
-            pendientes.orden_historia ASC,  -- Prioriza el orden de la historia
-            pendientes.Pendientes ASC       -- Luego por los que tengan menos pendientes
+            secuencia_intercalado ASC, 
+            CASE WHEN pendientes.Tipo = (SELECT valor FROM configuracion_pendientes WHERE clave = 'proximo_primero') THEN 1 ELSE 2 END ASC, 
+            pendientes.Pendientes ASC, 
+            pendientes.ID ASC
         LIMIT 1;
     ";
 
